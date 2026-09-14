@@ -9,9 +9,11 @@ export type JournalEntry = { id: string; bookId: number; type: string; text: str
 export type ReadingGoal = { id: string; label: string; target: number; current: number; unit: string; year: number };
 export type ReadingCircle = { id: string; name: string; description: string; currentBookId: number; members: number; visibility: "Public" | "Private" };
 export type AppEvent = { type: string; bookId?: number; createdAt: string };
-export type AppState = { library: LibraryBook[]; journal: JournalEntry[]; goals: ReadingGoal[]; circles: ReadingCircle[]; events: AppEvent[]; savedBookIds: number[]; profile: { name: string; username: string; bio: string } };
+export type Rating = { id: string; bookId: number; overall: number; dimensions: { atmosphere: number; characters: number; ideas: number; pace: number }; expectation?: "low" | "medium" | "high"; outcome?: "below" | "met" | "exceeded"; updatedAt: string };
+export type Review = { id: string; bookId: number; body: string; containsSpoilers: boolean; visibility: "private" | "public"; createdAt: string; updatedAt: string };
+export type AppState = { library: LibraryBook[]; journal: JournalEntry[]; goals: ReadingGoal[]; circles: ReadingCircle[]; events: AppEvent[]; savedBookIds: number[]; ratings: Rating[]; reviews: Review[]; profile: { name: string; username: string; bio: string } };
 
-type Store = AppState & { addBook: (book: Book) => void; updateBook: (id: number, patch: Partial<LibraryBook>) => void; removeBook: (id: number) => void; addJournal: (entry: Omit<JournalEntry, "id" | "createdAt">) => void; addGoal: (goal: Omit<ReadingGoal, "id">) => void; toggleSaved: (id: number) => void; addCircle: (circle: Omit<ReadingCircle, "id">) => void; resetLocalData: () => void };
+type Store = AppState & { addBook: (book: Book) => void; updateBook: (id: number, patch: Partial<LibraryBook>) => void; removeBook: (id: number) => void; addJournal: (entry: Omit<JournalEntry, "id" | "createdAt">) => void; addGoal: (goal: Omit<ReadingGoal, "id">) => void; toggleSaved: (id: number) => void; addCircle: (circle: Omit<ReadingCircle, "id">) => void; setRating: (rating: Omit<Rating, "id" | "updatedAt">) => void; upsertReview: (review: Omit<Review, "id" | "createdAt" | "updatedAt">) => void; removeReview: (id: string) => void; resetLocalData: () => void };
 
 const initialState: AppState = {
   library: seedBooks.map((book, index) => ({ ...book, progress: book.progress ?? 0, addedAt: new Date(Date.now() - index * 86400000).toISOString(), rating: book.id === 3 ? 4.5 : undefined, edition: "Paperback · English" })),
@@ -22,6 +24,8 @@ const initialState: AppState = {
   goals: [{ id: "g-1", label: "Books read", target: 24, current: 8, unit: "books", year: 2026 }],
   circles: [{ id: "c-1", name: "Slow pages club", description: "A gentle circle for atmospheric books and generous conversations.", currentBookId: 4, members: 38, visibility: "Public" }],
   events: [], savedBookIds: [1, 2],
+  ratings: [{ id: "r-3", bookId: 3, overall: 4.5, dimensions: { atmosphere: 4, characters: 5, ideas: 5, pace: 3 }, expectation: "high", outcome: "exceeded", updatedAt: "2026-09-04T09:00:00.000Z" }],
+  reviews: [],
   profile: { name: "Marta Albrici", username: "marta_reads", bio: "Stories with atmosphere, questions without easy answers." },
 };
 
@@ -31,7 +35,12 @@ const STORAGE_KEY = "bookloom-local-state-v1";
 export function LocalStoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(() => {
     if (typeof window === "undefined") return initialState;
-    try { const saved = window.localStorage.getItem(STORAGE_KEY); return saved ? JSON.parse(saved) as AppState : initialState; } catch { return initialState; }
+    try {
+      const saved = window.localStorage.getItem(STORAGE_KEY);
+      if (!saved) return initialState;
+      const parsed = JSON.parse(saved) as Partial<AppState>;
+      return { ...initialState, ...parsed, ratings: parsed.ratings ?? [], reviews: parsed.reviews ?? [] };
+    } catch { return initialState; }
   });
   const hydrated = true;
   useEffect(() => { if (hydrated) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }, [state, hydrated]);
@@ -44,6 +53,17 @@ export function LocalStoreProvider({ children }: { children: React.ReactNode }) 
     addGoal: (goal) => setState((current) => ({ ...current, goals: [{ ...goal, id: crypto.randomUUID() }, ...current.goals] })),
     toggleSaved: (id) => setState((current) => ({ ...current, savedBookIds: current.savedBookIds.includes(id) ? current.savedBookIds.filter((bookId) => bookId !== id) : [...current.savedBookIds, id] })),
     addCircle: (circle) => setState((current) => ({ ...current, circles: [{ ...circle, id: crypto.randomUUID() }, ...current.circles] })),
+    setRating: (rating) => setState((current) => {
+      const next = { ...rating, id: current.ratings.find((item) => item.bookId === rating.bookId)?.id ?? crypto.randomUUID(), updatedAt: new Date().toISOString() };
+      return { ...current, ratings: [next, ...current.ratings.filter((item) => item.bookId !== rating.bookId)], library: current.library.map((book) => book.id === rating.bookId ? { ...book, rating: rating.overall } : book), events: [{ type: "book_rated", bookId: rating.bookId, createdAt: next.updatedAt }, ...current.events] };
+    }),
+    upsertReview: (review) => setState((current) => {
+      const now = new Date().toISOString();
+      const existing = current.reviews.find((item) => item.bookId === review.bookId);
+      const next = { ...review, id: existing?.id ?? crypto.randomUUID(), createdAt: existing?.createdAt ?? now, updatedAt: now };
+      return { ...current, reviews: [next, ...current.reviews.filter((item) => item.bookId !== review.bookId)], events: [{ type: "review_updated", bookId: review.bookId, createdAt: now }, ...current.events] };
+    }),
+    removeReview: (id) => setState((current) => ({ ...current, reviews: current.reviews.filter((review) => review.id !== id) })),
     resetLocalData: () => setState(initialState),
   }), [state]);
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;
