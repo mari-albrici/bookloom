@@ -1,0 +1,6 @@
+import { Bell, ChevronRight, Lock, Palette, ShieldCheck, UserRound } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+
+const settings = [{ icon: UserRound, title: "Account & profile", detail: "Name, username, password" }, { icon: Lock, title: "Privacy", detail: "Profile, library and journal visibility" }, { icon: Bell, title: "Notifications", detail: "Choose what deserves your attention" }, { icon: Palette, title: "Appearance", detail: "Light theme · Fraunces editorial type" }, { icon: ShieldCheck, title: "Data & personalization", detail: "Export, recommendations and consent" }];
+
+export default function SettingsPage() { return <AppShell><div className="page-wrap narrow-page"><div className="subpage-heading"><div><p className="eyebrow">Make Bookloom yours</p><h1>Settings</h1><p className="lede">Quiet controls for your reading life.</p></div></div><section className="settings-list">{settings.map(({ icon: Icon, title, detail }) => <button className="settings-row" key={title}><span className="settings-icon"><Icon size={18} /></span><span><strong>{title}</strong><small>{detail}</small></span><ChevronRight size={18} /></button>)}</section><div className="settings-foot"><p>Bookloom keeps your journal private by default.</p><span>Version 0.1 · Core reading is free</span></div></div></AppShell>; }

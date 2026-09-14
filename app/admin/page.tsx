@@ -1,0 +1,8 @@
+"use client";
+
+import { AlertTriangle, BookCopy, CheckCircle2, ClipboardList, Database, ShieldCheck, Users } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+
+const checks = [{ label: "Paid campaigns separated from organic scores", ok: true }, { label: "Journal privacy defaults enabled", ok: true }, { label: "Professional cohort threshold configured", ok: true }, { label: "Supabase connection", ok: false }];
+
+export default function AdminPage() { return <AppShell><div className="page-wrap"><div className="subpage-heading"><div><p className="eyebrow">Operations & integrity</p><h1>Admin console</h1><p className="lede">Local mode is active. Supabase actions are intentionally paused.</p></div><span className="mode-badge"><Database size={14} /> Local mode</span></div><section className="admin-grid"><div className="admin-stat"><Users size={18} /><strong>24</strong><span>seed reader profiles</span></div><div className="admin-stat"><BookCopy size={18} /><strong>4</strong><span>works in catalog</span></div><div className="admin-stat"><ClipboardList size={18} /><strong>0</strong><span>unresolved reports</span></div><div className="admin-stat warning"><AlertTriangle size={18} /><strong>1</strong><span>connection paused</span></div></section><section className="admin-panel"><div className="panel-heading"><div><p className="eyebrow">Integrity checks</p><h2>Trust invariants</h2></div><ShieldCheck size={21} color="var(--sage)" /></div>{checks.map((check) => <div className="integrity-row" key={check.label}>{check.ok ? <CheckCircle2 size={17} color="var(--sage)" /> : <AlertTriangle size={17} color="var(--terracotta)" />}<span>{check.label}</span><small>{check.ok ? "PASS" : "PAUSED"}</small></div>)}</section></div></AppShell>; }
